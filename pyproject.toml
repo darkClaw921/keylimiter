@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+# Корень проекта в sys.path, чтобы `pytest` работал так же, как `python -m pytest`.
+pythonpath = ["."]
+testpaths = ["tests"]
