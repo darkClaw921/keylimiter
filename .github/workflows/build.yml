@@ -1,0 +1,67 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Установка зависимостей
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Тесты
+        run: pytest -q
+      - name: Проверка импорта Windows-модулей
+        run: python -c "import keylimiter.hook, keylimiter.gui, keylimiter.main; print('imports ok')"
+
+  build:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Установка зависимостей
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller==6.11.1
+      - name: Сборка exe
+        run: pyinstaller --clean --noconfirm build.spec
+      - name: Проверка артефакта
+        run: |
+          if (-not (Test-Path dist/KeyLimiter.exe)) { throw "dist/KeyLimiter.exe не создан" }
+          Get-Item dist/KeyLimiter.exe | Format-List Name, Length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KeyLimiter-exe
+          path: dist/KeyLimiter.exe
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: KeyLimiter-exe
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: KeyLimiter.exe
+          generate_release_notes: true
