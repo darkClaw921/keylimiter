@@ -20,6 +20,14 @@ COLUMNS = (
 LOG_LIMIT = 200
 
 
+def format_log_time(ts: float) -> str:
+    """Время для журнала с миллисекундами: 14:03:27.415."""
+    # Округляем один раз до целых мс: иначе .415 из-за float может стать .414,
+    # а .9996 — «.1000» при неизменных секундах.
+    seconds, millis = divmod(round(ts * 1000), 1000)
+    return time.strftime("%H:%M:%S", time.localtime(seconds)) + f".{millis:03d}"
+
+
 class RuleDialog(tk.Toplevel):
     """Диалог добавления/изменения правила с записью клавиши через хук."""
 
@@ -260,10 +268,13 @@ class App:
             "resumed": "Работа возобновлена",
             "error": f"Ошибка: {event.detail}",
         }
-        self._append_log(messages.get(event.kind, f"{event.kind}: {event.detail}"))
+        self._append_log(messages.get(event.kind, f"{event.kind}: {event.detail}"),
+                         ts=event.ts or None)
 
-    def _append_log(self, text: str) -> None:
-        self.log.insert("end", f"{time.strftime('%H:%M:%S')}  {text}")
+    def _append_log(self, text: str, ts: float | None = None) -> None:
+        # Время события из хука, а не момента опроса очереди (он отстаёт до 50 мс).
+        stamp = format_log_time(time.time() if ts is None else ts)
+        self.log.insert("end", f"{stamp}  {text}")
         if self.log.size() > LOG_LIMIT:
             self.log.delete(0, self.log.size() - LOG_LIMIT)
         self.log.see("end")
