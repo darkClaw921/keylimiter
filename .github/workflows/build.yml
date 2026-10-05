@@ -24,7 +24,7 @@ jobs:
       - name: Тесты
         run: pytest -q
       - name: Проверка импорта Windows-модулей
-        run: python -c "import keylimiter.hook, keylimiter.gui, keylimiter.main; print('imports ok')"
+        run: python -c "import keylimiter.hook, keylimiter.gui, keylimiter.main, keylimiter.scheduler, keylimiter.wininput; print('imports ok')"
 
   build:
     needs: test

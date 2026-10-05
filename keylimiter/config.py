@@ -3,10 +3,11 @@
 import json
 import logging
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 from .keys import vk_from_name
+from .scheduler import DEFAULT_TIMEZONE, AutoEnterSettings
 
 log = logging.getLogger(__name__)
 
@@ -32,6 +33,8 @@ class Config:
     pause_hotkey: str = "ctrl+alt+p"
     count_injected: bool = True
     rules: list[Rule] = None  # type: ignore[assignment]
+    auto_enter: AutoEnterSettings = field(default_factory=AutoEnterSettings)
+    timers: list[AutoEnterSettings] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.rules is None:
@@ -73,6 +76,21 @@ def _parse_rule(raw: object) -> Rule | None:
     )
 
 
+def _parse_auto_enter(raw: object) -> AutoEnterSettings | None:
+    try:
+        if not isinstance(raw, dict):
+            raise ValueError("ожидался объект")
+        return AutoEnterSettings(
+            time=raw.get("time", "12:00:00"),
+            count=raw.get("count", 1),
+            interval_ms=raw.get("interval_ms", 200),
+            timezone=raw.get("timezone", DEFAULT_TIMEZONE),
+        )
+    except ValueError as exc:
+        log.warning("Некорректные настройки автоматического Enter: %s", exc)
+        return None
+
+
 def load() -> Config:
     """Читает config.json; при отсутствии или поломке возвращает дефолт и пересоздаёт файл."""
     path = config_path()
@@ -96,11 +114,30 @@ def load() -> Config:
         log.warning("В конфиге нет корректных правил — добавлено правило по умолчанию (ENTER)")
         rules = [Rule(key="ENTER")]
 
+    parsed_auto_enter = _parse_auto_enter(raw.get("auto_enter", {}))
+    auto_enter = parsed_auto_enter or AutoEnterSettings()
+    if "timers" not in raw:
+        # Существующие настройки одного таймера переносим в новый список.
+        timers = [replace(auto_enter)] if "auto_enter" in raw and parsed_auto_enter else []
+    elif not isinstance(raw["timers"], list):
+        log.warning("Список таймеров повреждён: ожидался массив")
+        timers = []
+    else:
+        timers = []
+        for index, item in enumerate(raw["timers"]):
+            timer = _parse_auto_enter(item)
+            if timer is not None:
+                timers.append(timer)
+            else:
+                log.warning("Таймер №%s пропущен", index + 1)
+
     return Config(
         enabled_on_start=bool(raw.get("enabled_on_start", True)),
         pause_hotkey=str(raw.get("pause_hotkey", "ctrl+alt+p")),
         count_injected=bool(raw.get("count_injected", True)),
         rules=rules,
+        auto_enter=auto_enter,
+        timers=timers,
     )
 
 

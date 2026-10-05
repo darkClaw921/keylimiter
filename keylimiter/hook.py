@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from .config import Rule
 from .keys import name_from_vk
 from .limiter import RateLimiter
+from .wininput import AUTO_ENTER_MARKER
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class KBDLLHOOKSTRUCT(ctypes.Structure):
         ("scanCode", wt.DWORD),
         ("flags", wt.DWORD),
         ("time", wt.DWORD),
-        ("dwExtraInfo", ctypes.POINTER(wt.ULONG)),
+        ("dwExtraInfo", ctypes.c_size_t),
     ]
 
 
@@ -213,6 +214,10 @@ class KeyboardHook:
     def _handle_event(self, user32, w_param, l_param) -> bool:
         """True — событие нужно подавить."""
         data = ctypes.cast(l_param, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+        # Собственная серия должна пройти целиком и не менять состояние
+        # физических клавиш, запись клавиши и счётчики лимитера.
+        if data.flags & LLKHF_INJECTED and data.dwExtraInfo == AUTO_ENTER_MARKER:
+            return False
         vk = int(data.vkCode)
         is_down = w_param in _DOWN_MESSAGES
         is_up = w_param in _UP_MESSAGES
