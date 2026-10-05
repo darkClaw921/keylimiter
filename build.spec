@@ -5,12 +5,16 @@ UPX намеренно отключён — сжатый бинарник с к�
 получает ложное срабатывание антивируса.
 """
 
+from PyInstaller.utils.hooks import collect_all
+
+tzdata_datas, tzdata_binaries, tzdata_imports = collect_all('tzdata')
+
 a = Analysis(
     ['__main__.py'],
     pathex=[],
-    binaries=[],
-    datas=[],
-    hiddenimports=['pystray._win32', 'PIL.Image', 'PIL.ImageDraw'],
+    binaries=tzdata_binaries,
+    datas=tzdata_datas,
+    hiddenimports=['pystray._win32', 'PIL.Image', 'PIL.ImageDraw'] + tzdata_imports,
     hookspath=[],
     runtime_hooks=[],
     excludes=['numpy', 'pandas', 'matplotlib', 'pytest'],

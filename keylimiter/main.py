@@ -37,6 +37,7 @@ def main(argv: list[str] | None = None) -> int:
 
     from .gui import App
     from .hook import KeyboardHook
+    from .wininput import EnterSender
 
     hook = KeyboardHook(
         rules=cfg.rules,
@@ -46,8 +47,9 @@ def main(argv: list[str] | None = None) -> int:
     hook.set_paused(not cfg.enabled_on_start)
     hook.start()
 
-    app = App(cfg, hook)
     try:
+        sender = EnterSender()
+        app = App(cfg, hook, press_enter=sender.press_enter)
         app.run(start_hidden=args.headless)
     finally:
         hook.stop()
